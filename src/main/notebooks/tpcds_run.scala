@@ -6,18 +6,18 @@
 
 // Database to be used:
 // TPCDS Scale factor
-val scaleFactor = "1"
+val scaleFactor = "100"
 // If false, float type will be used instead of decimal.
 val useDecimal = true
 // If false, string type will be used instead of date.
 val useDate = true
 // name of database to be used.
-val databaseName = s"tpcds_sf${scaleFactor}" +
-  s"""_${if (useDecimal) "with" else "no"}decimal""" +
-  s"""_${if (useDate) "with" else "no"}date""" +
-  s"""_${if (filterNull) "no" else "with"}nulls"""
+val databaseName = s"tpcds_sf${scaleFactor}_parquet"// +
+ // s"""_${if (useDecimal) "with" else "no"}decimal""" +
+//  s"""_${if (useDate) "with" else "no"}date""" //+
+//  s"""_${if (filterNull) "no" else "with"}nulls"""
 
-val iterations = 2 // how many times to run the whole set of queries.
+val iterations = 3 // how many times to run the whole set of queries.
 
 val timeout = 60 // timeout in hours
 
@@ -26,7 +26,7 @@ val query_filter = Seq() // Seq() == all queries
 val randomizeQueries = false // run queries in a random order. Recommended for parallel runs.
 
 // detailed results will be written as JSON to this location.
-val resultLocation = "/mnt/performance-datasets/tpcds/results"
+val resultLocation = "s3a://mhb-dev-bucket/spark-sql-perf/tpcds-photon-results"
 
 // COMMAND ----------
 

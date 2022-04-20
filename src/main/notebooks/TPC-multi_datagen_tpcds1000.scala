@@ -1,7 +1,7 @@
 // Databricks notebook source
 // Multi TPC- H and DS generator and database importer using spark-sql-perf, typically to generate parquet files in S3/blobstore objects
-val benchmarks = Seq("TPCDS", "TPCH") // Options: TCPDS", "TPCH"
-val scaleFactors = Seq("1", "10", "100", "1000") // "1", "10", "100", "1000", "10000" list of scale factors to generate and import
+val benchmarks = Seq("TPCDS") // Options: TCPDS", "TPCH"
+val scaleFactors = Seq("1000") // "1", "10", "100", "1000", "10000" list of scale factors to generate and import
 
 val baseLocation = s"s3a://mhb-dev-bucket/spark-sql-perf/" // S3 bucket, blob, or local root path
 val baseDatagenFolder = "/tmp"  // usually /tmp if enough space is available for datagen files

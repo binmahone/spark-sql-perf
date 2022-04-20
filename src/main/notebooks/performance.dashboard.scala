@@ -1,4 +1,4 @@
-// Databricks notebook source exported at Fri, 11 Sep 2015 06:27:08 UTC
+// Databricks notebook source
 import com.databricks.spark.sql.perf._
 
 import org.apache.spark.sql._
@@ -6,7 +6,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.expressions._
 import org.apache.spark.sql.types._
 
-sqlContext.read.load("/databricks/spark/sql/sqlPerformanceCompact").registerTempTable("sqlPerformanceCompact")
+sqlContext.read.json("s3://mhb-dev-bucket/spark-sql-perf/tpcds-results/").createOrReplaceTempView("sqlPerformanceCompact")
 
 val timestampWindow = Window.partitionBy("sparkVersion").orderBy($"timestamp".desc)
 
@@ -14,14 +14,13 @@ val normalizeVersion = udf((v: String) => v.stripSuffix("-SNAPSHOT"))
 
 class RecentRuns(prefix: String, inputFunction: DataFrame => DataFrame) {
   val inputData = table("sqlPerformanceCompact") 
-    .where($"tags.runtype" === "daily")
+    .where($"tags.runtype" === "benchmark")
     .withColumn("sparkVersion", normalizeVersion($"configuration.sparkVersion"))
     .withColumn("startTime", from_unixtime($"timestamp" / 1000))
     .withColumn("database", $"tags.database")
-    .withColumn("jobname", $"tags.jobname")
   
   val recentRuns = inputFunction(inputData)
-    .withColumn("runId", denseRank().over(timestampWindow))
+    .withColumn("runId", dense_rank().over(timestampWindow))
     .withColumn("runId", -$"runId")
     .filter($"runId" >= -10) 
 
@@ -31,7 +30,7 @@ class RecentRuns(prefix: String, inputFunction: DataFrame => DataFrame) {
     .withColumn("runtimeSeconds", runtime / 1000)
     .withColumn("queryName", $"result.name")
 
-  baseData.registerTempTable(s"${prefix}_baseData")
+  baseData.createOrReplaceTempView(s"${prefix}_baseData")
 
   val smoothed = baseData
     .where($"iteration" !== 1)
@@ -39,10 +38,14 @@ class RecentRuns(prefix: String, inputFunction: DataFrame => DataFrame) {
     .agg(callUDF("percentile", $"runtimeSeconds".cast("long"), lit(0.5)).as('medianRuntimeSeconds))
     .orderBy($"runId", $"sparkVersion")
 
-  smoothed.registerTempTable(s"${prefix}_smoothed")
+  smoothed.createOrReplaceTempView(s"${prefix}_smoothed")
 }
 
-val tpcds1500 = new RecentRuns("tpcds1500", _.filter($"database" === "tpcds1500"))
+val tpcds1500 = new RecentRuns("tpcds1500", _.filter($"database" === "tpcds_sf100_parquet"))
+
+// COMMAND ----------
+
+display(sql("select * from tpcds1500_baseData"))
 
 // COMMAND ----------
 
@@ -88,7 +91,7 @@ sqlContext.udf.register("gm", gm)
 
 // COMMAND ----------
 
-// MAGIC %python spark_versions = ["1.6.0", "1.5.0", "1.4.1"]
+// MAGIC %python spark_versions = ["3.2.1"]
 // MAGIC 
 // MAGIC def plot_single(df, column, height = 30):
 // MAGIC   for v in spark_versions:

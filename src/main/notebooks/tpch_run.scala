@@ -6,10 +6,10 @@ val scaleFactors = Seq(1, 10, 100, 1000) //set scale factors to run
 val format = "parquet" //format has have already been generated
 
 def perfDatasetsLocation(scaleFactor: Int, format: String) = 
-  s"s3a://my-bucket/tpch/sf${scaleFactor}_${format}"
+  s"s3a://mhb-dev-bucket/spark-sql-perf/tpch/sf${scaleFactor}_${format}"
 
-val resultLocation = "s3a://my-bucket/results"
-val iterations = 2
+val resultLocation = "s3a://mhb-dev-bucket/spark-sql-perf/tpch-results"
+val iterations = 3
 def databaseName(scaleFactor: Int, format: String) = s"tpch_sf${scaleFactor}_${format}"
 val randomizeQueries = false //to use on concurrency tests
 
@@ -64,7 +64,7 @@ scaleFactors.foreach{ scaleFactor =>
    "scale_factor" -> scaleFactor.toString,
    "spark_version" -> spark.version,
    "system" -> "Spark",
-   "workers" -> workers,
+   "workers" -> s"$workers",
    "workerInstanceType" -> workerInstanceType,
    "configuration" -> configuration
    )

@@ -36,37 +36,35 @@ import com.databricks.spark.sql.perf.cpu._
  *
  * @param sqlContext An existing SQLContext.
  */
-abstract class Benchmark(
-    @transient val sqlContext: SQLContext)
-  extends Serializable {
+abstract class Benchmark(@transient val sqlContext: SQLContext) extends Serializable {
 
   import Benchmark._
 
   def this() = this(SparkSession.builder.getOrCreate().sqlContext)
 
   val resultsLocation =
-    sqlContext.getAllConfs.getOrElse(
-      "spark.sql.perf.results",
-      "/spark/sql/performance")
+    sqlContext.getAllConfs.getOrElse("spark.sql.perf.results", "/spark/sql/performance")
 
   protected def sparkContext = sqlContext.sparkContext
 
   protected implicit def toOption[A](a: A): Option[A] = Option(a)
 
-  val buildInfo = Try(getClass.getClassLoader.loadClass("org.apache.spark.BuildInfo")).map { cls =>
-    cls.getMethods
-      .filter(_.getReturnType == classOf[String])
+  val buildInfo = Try(getClass.getClassLoader.loadClass("org.apache.spark.BuildInfo"))
+    .map { cls =>
+      cls.getMethods
+        .filter(_.getReturnType == classOf[String])
         .filterNot(_.getName == "toString")
         .map(m => m.getName -> m.invoke(cls).asInstanceOf[String])
         .toMap
-  }.getOrElse(Map.empty)
+    }
+    .getOrElse(Map.empty)
 
-  def currentConfiguration = BenchmarkConfiguration(
-    sqlConf = sqlContext.getAllConfs,
-    sparkConf = sparkContext.getConf.getAll.toMap,
-    defaultParallelism = sparkContext.defaultParallelism,
-    buildInfo = buildInfo)
-
+  def currentConfiguration =
+    BenchmarkConfiguration(
+      sqlConf = sqlContext.getAllConfs,
+      sparkConf = sparkContext.getConf.getAll.toMap,
+      defaultParallelism = sparkContext.defaultParallelism,
+      buildInfo = buildInfo)
 
   val codegen = Variation("codegen", Seq("on", "off")) {
     case "off" => sqlContext.setConf("spark.sql.codegen", "false")
@@ -102,16 +100,27 @@ abstract class Benchmark(
       executionsToRun: Seq[Benchmarkable],
       includeBreakdown: Boolean = false,
       iterations: Int = 3,
-      variations: Seq[Variation[_]] = Seq(Variation("StandardRun", Seq("true")) { _ => {} }),
+      variations: Seq[Variation[_]] = Seq(Variation("StandardRun", Seq("true")) { _ =>
+        {}
+      }),
       tags: Map[String, String] = Map.empty,
       timeout: Long = 0L,
       resultLocation: String = resultsLocation,
       forkThread: Boolean = true) = {
 
-    new ExperimentStatus(executionsToRun, includeBreakdown, iterations, variations, tags,
-      timeout, resultLocation, sqlContext, allTables, currentConfiguration, forkThread = forkThread)
+    new ExperimentStatus(
+      executionsToRun,
+      includeBreakdown,
+      iterations,
+      variations,
+      tags,
+      timeout,
+      resultLocation,
+      sqlContext,
+      allTables,
+      currentConfiguration,
+      forkThread = forkThread)
   }
-
 
   import reflect.runtime._, universe._
   import reflect.runtime._
@@ -128,14 +137,16 @@ abstract class Benchmark(
       .filter(m => m.isMethod)
       .map(_.asMethod)
       .filter(_.asMethod.returnType =:= typeOf[Table])
-      .map(method => runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Table])
+      .map(method =>
+        runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Table])
 
   def groupedTables =
     myType.declarations
       .filter(m => m.isMethod)
       .map(_.asMethod)
       .filter(_.asMethod.returnType =:= typeOf[Seq[Table]])
-      .flatMap(method => runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Seq[Table]])
+      .flatMap(method =>
+        runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Seq[Table]])
 
   @transient
   lazy val allTables: Seq[Table] = (singleTables ++ groupedTables).toSeq
@@ -145,14 +156,21 @@ abstract class Benchmark(
       .filter(m => m.isMethod)
       .map(_.asMethod)
       .filter(_.asMethod.returnType =:= typeOf[Benchmarkable])
-      .map(method => runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Benchmarkable])
+      .map(method =>
+        runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Benchmarkable])
 
   def groupedQueries =
     myType.declarations
       .filter(m => m.isMethod)
       .map(_.asMethod)
       .filter(_.asMethod.returnType =:= typeOf[Seq[Benchmarkable]])
-      .flatMap(method => runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Seq[Benchmarkable]])
+      .flatMap(
+        method =>
+          runtimeMirror
+            .reflect(this)
+            .reflectMethod(method)
+            .apply()
+            .asInstanceOf[Seq[Benchmarkable]])
 
   @transient
   lazy val allQueries = (singleQueries ++ groupedQueries).toSeq
@@ -163,21 +181,24 @@ abstract class Benchmark(
         .filter(m => m.isMethod)
         .map(_.asMethod)
         .filter(_.asMethod.returnType =:= typeOf[Query])
-        .map(method => runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Query])
+        .map(method =>
+          runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Query])
         .mkString(",")
     val queries =
       myType.declarations
-      .filter(m => m.isMethod)
-      .map(_.asMethod)
-      .filter(_.asMethod.returnType =:= typeOf[Seq[Query]])
-      .map { method =>
-        val queries = runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Seq[Query]]
-        val queryList = queries.map(_.name).mkString(", ")
-        s"""
+        .filter(m => m.isMethod)
+        .map(_.asMethod)
+        .filter(_.asMethod.returnType =:= typeOf[Seq[Query]])
+        .map { method =>
+          val queries =
+            runtimeMirror.reflect(this).reflectMethod(method).apply().asInstanceOf[Seq[Query]]
+          val queryList = queries.map(_.name).mkString(", ")
+          s"""
           |<h3>${method.name}</h3>
           |<ul>$queryList</ul>
         """.stripMargin
-    }.mkString("\n")
+        }
+        .mkString("\n")
 
     s"""
        |<h1>Spark SQL Performance Benchmarking</h1>
@@ -197,24 +218,14 @@ abstract class Benchmark(
       new Query(name, sqlContext.sql(sqlText), description, Some(sqlText), executionMode)
     }
 
-    def apply(
-        name: String,
-        dataFrameBuilder: => DataFrame,
-        description: String): Query = {
+    def apply(name: String, dataFrameBuilder: => DataFrame, description: String): Query = {
       new Query(name, dataFrameBuilder, description, None, ExecutionMode.CollectResults)
     }
   }
 
   object RDDCount {
-    def apply(
-        name: String,
-        rdd: RDD[_]) = {
-      new SparkPerfExecution(
-        name,
-        Map.empty,
-        () => Unit,
-        () => rdd.count(),
-        rdd.toDebugString)
+    def apply(name: String, rdd: RDD[_]) = {
+      new SparkPerfExecution(name, Map.empty, () => Unit, () => rdd.count(), rdd.toDebugString)
     }
   }
 
@@ -225,7 +236,7 @@ abstract class Benchmark(
       prepare: () => Unit,
       run: () => Unit,
       description: String = "")
-    extends Benchmarkable {
+      extends Benchmarkable {
 
     override def toString: String =
       s"""
@@ -280,10 +291,7 @@ abstract class Benchmark(
  */
 case class Variation[T](name: String, options: Seq[T])(val setup: T => Unit)
 
-case class Table(
-    name: String,
-    data: Dataset[_])
-
+case class Table(name: String, data: Dataset[_])
 
 object Benchmark {
 
@@ -318,15 +326,15 @@ object Benchmark {
     /** An optional log collection task that will run after the experiment. */
     @volatile var logCollection: () => Unit = () => {}
 
-
     def cartesianProduct[T](xss: List[List[T]]): List[List[T]] = xss match {
       case Nil => List(Nil)
-      case h :: t => for(xh <- h; xt <- cartesianProduct(t)) yield xh :: xt
+      case h :: t => for (xh <- h; xt <- cartesianProduct(t)) yield xh :: xt
     }
 
     val timestamp = System.currentTimeMillis()
     val resultPath = s"$resultsLocation/timestamp=$timestamp"
-    val combinations = cartesianProduct(variations.map(l => (0 until l.options.size).toList).toList)
+    val combinations = cartesianProduct(
+      variations.map(l => (0 until l.options.size).toList).toList)
     val resultsFuture = Future {
 
       // If we're running queries, create tables for them
@@ -353,8 +361,7 @@ object Benchmark {
                 .find(_.name == name)
               if (table.isDefined) {
                 logMessage(s"Creating table: $name")
-                table.get.data
-                  .write
+                table.get.data.write
                   .mode("overwrite")
                   .saveAsTable(name)
               } else {
@@ -372,10 +379,11 @@ object Benchmark {
               v.setup(v.options(idx))
               v.name -> v.options(idx).toString
           }
-          currentConfig = currentOptions.map { case (k,v) => s"$k: $v" }.mkString(", ")
+          currentConfig = currentOptions.map { case (k, v) => s"$k: $v" }.mkString(", ")
 
           val res = executionsToRun.flatMap { q =>
-            val setup = s"iteration: $i, ${currentOptions.map { case (k, v) => s"$k=$v"}.mkString(", ")}"
+            val setup =
+              s"iteration: $i, ${currentOptions.map { case (k, v) => s"$k=$v" }.mkString(", ")}"
             logMessage(s"Running execution ${q.name} $setup")
 
             currentExecution = q.name
@@ -392,8 +400,12 @@ object Benchmark {
             startTime = System.currentTimeMillis()
 
             val singleResultT = Try {
-              q.benchmark(includeBreakdown, setup, currentMessages, timeout,
-                forkThread=forkThread)
+              q.benchmark(
+                includeBreakdown,
+                setup,
+                currentMessages,
+                timeout,
+                forkThread = forkThread)
             }
 
             singleResultT match {
@@ -500,7 +512,6 @@ object Benchmark {
 
     override def toString =
       s"""Permalink: table("sqlPerformance").where('timestamp === ${timestamp}L)"""
-
 
     def html: String = {
       val maybeQueryPlan: String =
