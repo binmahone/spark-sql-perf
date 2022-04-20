@@ -11,7 +11,7 @@ val fileFormat = "parquet" // only parquet was tested
 val shuffle = true // If true, partitions will be coalesced into a single file during generation up to spark.sql.files.maxRecordsPerFile (if set)
 val overwrite = false //if to delete existing files (doesn't check if results are complete on no-overwrite)
 
-// Generate stats for CBO
+// Generate stats for CBO .
 val createTableStats = true
 val createColumnStats = true
 
